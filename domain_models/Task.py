@@ -1,35 +1,76 @@
+from uuid import uuid4
 from typing import Optional
 from datetime import datetime, timezone
-from dataclasses import dataclass
+
+from pydantic import BaseModel, Field, model_validator
 
 
 
-def validate_non_negative_int(value, field_name):
-    if value is not None:
-        if not isinstance(value, int):
-            raise TypeError(f"Value {field_name} must be integer, got {type(value).__name__}")
+class TimeRecord(BaseModel):
+    hours: int = Field(default=0, ge=0, description="Hours (non-negative)")
+    minutes: int = Field(default=0, ge=0, description="Minutes (non-negative)")
 
-        if value < 0:
-            raise ValueError(f"Value {field_name} must be non-negative, got {value}")
-
-
-@dataclass
-class TimeRecord:
-    hours: Optional[int] = 0
-    minutes: Optional[int] = 0
-
-    def __post_init__(self):
-        validate_non_negative_int(self.hours, 'hours')
-        validate_non_negative_int(self.minutes, 'minutes')
+    @model_validator(mode='after')
+    def normalize_time(self):
+        self.hours += self.minutes // 60
+        self.minutes = self.minutes % 60
+        return self
 
 
-    def __setattr__(self, name, value):
-        if name in ('hours', 'minutes'):
-            validate_non_negative_int(value, name)
-        super().__setattr__(name, value)
+    def __add__(self, other):
+        if not isinstance(other, TimeRecord):
+            raise TypeError("expected type: TimeRecord")
+
+        self.minutes += other.minutes % 60
+        self.hours += other.hours + other.minutes // 60
+
+        return TimeRecord(
+            hours=self.hours,
+            minutes=self.minutes
+        )
+
+    def __sub__(self, other):
+        if not isinstance(other, TimeRecord):
+            raise TypeError("expected type: TimeRecord")
+
+        target_minutes_value = self.minutes
+        target_hours_value = self.hours
+
+        target_minutes_value -= other.minutes % 60
+        target_hours_value -= (other.hours + other.minutes // 60)
+
+        if target_hours_value < 0 or target_hours_value < 0:
+            raise ValueError("TimeRecord value cannot be negative")
+
+        return TimeRecord(
+            hours=target_hours_value,
+            minutes=target_minutes_value
+        )
+
 
     def __str__(self):
-        return f"{self.hours or 0}h {self.minutes or 0}m"
+        return f"{self.hours} h {self.minutes} m"
+
+
+class Deadline(BaseModel):
+    deadline: datetime = Field(..., description="deadline (not less than now)")
+
+    @model_validator(mode='after')
+    def check_datetime(self):
+        tz_info = self.deadline
+        if tz_info is None or tz_info != timezone.utc:
+            ValueError("UTC time zone is required")
+
+        now = datetime.now(tz=timezone.utc)
+        if self.deadline <= now:
+            raise ValueError(
+                f"Deadline must be in the future. Current time: {now}, deadline: {self.deadline}"
+            )
+
+        return self
+
+    def __str__(self):
+        return f"{self.deadline.isoformat()}"
 
 
 class Task:
@@ -41,24 +82,23 @@ class Task:
             executor_id: str,
             project_id: str,
             status: str,
-            deadline: Optional[datetime] = None,
-            estimated_hours: Optional[int] = 0,
-            estimated_minutes: Optional[int] = 0,
-            spent_hours: Optional[int] = 0,
-            spent_minutes: Optional[int] = 0
+            deadline: datetime = None,
+            estimated_hours: int = 0,
+            estimated_minutes: int = 0,
+            spent_hours: int = 0,
+            spent_minutes: int = 0
 
     ):
+        self.id = str(uuid4())
         self.title = title
         self.description = description
         self.creator_id = creator_id
         self.executor_id = executor_id
         self.project_id = project_id
         self.status = status
-        self.deadline = deadline
+        self.deadline = Deadline(deadline=deadline)
         self.estimated_time = TimeRecord(hours=estimated_hours, minutes=estimated_minutes)
         self.spent_time = TimeRecord(hours=spent_hours, minutes=spent_minutes)
-
-
 
 
     @classmethod
@@ -70,21 +110,12 @@ class Task:
             executor_id: str,
             project_id: str,
             status: str,
-            deadline: Optional[datetime] = None,
-            estimated_hours: Optional[int] = 0,
-            estimated_minutes: Optional[int] = 0,
-            spent_hours: Optional[int] = 0,
-            spent_minutes: Optional[int] = 0
+            deadline: datetime = None,
+            estimated_hours: int = 0,
+            estimated_minutes: int = 0,
+            spent_hours: int = 0,
+            spent_minutes: int = 0
     ):
-
-        if deadline is not None:
-            now = datetime.now(tz=timezone.utc)
-
-            if deadline <= now:
-                raise ValueError(
-                    f"Deadline must be in the future. Current time: {now}, deadline: {deadline}"
-                )
-
         return cls(
             title,
             description,
@@ -99,6 +130,27 @@ class Task:
             spent_minutes
         )
 
+    def change_title(self, new_title: str):
+        self.title = new_title
+
+    def change_description(self, new_description: str):
+        self.description = new_description
+
+    def change_executor(self, new_executor_id: str):
+        self.executor_id = new_executor_id
+
+    def change_status(self, new_status: str):
+        self.status = new_status
+
+    def set_deadline(self, new_deadline: datetime):
+        self.deadline = Deadline(deadline=new_deadline)
+
+    def set_estimated_time(self, hours: int = 0, minutes: int = 0):
+        self.estimated_time = TimeRecord(hours=hours, minutes=minutes)
+
+    def add_spend_time(self, hours: int = 0, minutes: int = 0):
+        self.spent_time += TimeRecord(hours=hours, minutes=minutes)
+
 
 if __name__ == "__main__":
     task = Task.create(
@@ -108,6 +160,11 @@ if __name__ == "__main__":
         executor_id="executor_id",
         project_id="project_id",
         status="NEW",
-        deadline=datetime(year=2026, month=8, day=18, tzinfo=timezone.utc),
+        deadline=datetime(year=2026, month=8, day=30, tzinfo=timezone.utc)
     )
 
+    print(task.spent_time)
+
+    task.add_spend_time(2, 30)
+
+    print(task.spent_time)
