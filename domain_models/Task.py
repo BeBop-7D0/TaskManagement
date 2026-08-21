@@ -33,18 +33,20 @@ class TimeRecord(BaseModel):
         if not isinstance(other, TimeRecord):
             raise TypeError("expected type: TimeRecord")
 
-        target_minutes_value = self.minutes
-        target_hours_value = self.hours
 
-        target_minutes_value -= other.minutes % 60
-        target_hours_value -= (other.hours + other.minutes // 60)
+        target_total_minutes = self.minutes + self.hours * 60
+        other_total_minutes = other.minutes + other.hours * 60
 
-        if target_hours_value < 0 or target_hours_value < 0:
+        target_total_minutes -= other_total_minutes
+
+        if target_total_minutes < 0:
             raise ValueError("TimeRecord value cannot be negative")
 
+        target_hours = target_total_minutes // 60
+        target_minutes = target_total_minutes % 60
         return TimeRecord(
-            hours=target_hours_value,
-            minutes=target_minutes_value
+            hours=target_hours,
+            minutes=target_minutes
         )
 
 
@@ -59,7 +61,7 @@ class Deadline(BaseModel):
     def check_datetime(self):
         tz_info = self.deadline
         if tz_info is None or tz_info != timezone.utc:
-            ValueError("UTC time zone is required")
+            raise ValueError("UTC time zone is required")
 
         now = datetime.now(tz=timezone.utc)
         if self.deadline <= now:
@@ -116,6 +118,23 @@ class Task:
             spent_hours: int = 0,
             spent_minutes: int = 0
     ):
+
+        if not title.strip():
+            raise ValueError("Title can not be empty string")
+
+        if not description.strip():
+            raise ValueError("Description can not be empty string")
+
+        if not creator_id.strip():
+            raise ValueError("Creator_id value can not be empty string")
+
+        if not executor_id.strip():
+            raise ValueError("Executor_id value can not be empty string")
+
+        if not status.strip():
+            raise ValueError("Status of task can not be empty string")
+
+
         return cls(
             title,
             description,
@@ -131,15 +150,25 @@ class Task:
         )
 
     def change_title(self, new_title: str):
+        if not new_title.strip():
+            raise ValueError("Title can not be empty string")
+
         self.title = new_title
 
     def change_description(self, new_description: str):
+        if not new_description.strip():
+            raise ValueError("Description can not be empty string")
+
         self.description = new_description
 
     def change_executor(self, new_executor_id: str):
+        if not new_executor_id:
+            raise ValueError("Executor_id value can not be empty string")
         self.executor_id = new_executor_id
 
     def change_status(self, new_status: str):
+        if not new_status.strip():
+            raise ValueError("Status of task can not be empty string")
         self.status = new_status
 
     def set_deadline(self, new_deadline: datetime):
@@ -163,8 +192,3 @@ if __name__ == "__main__":
         deadline=datetime(year=2026, month=8, day=30, tzinfo=timezone.utc)
     )
 
-    print(task.spent_time)
-
-    task.add_spend_time(2, 30)
-
-    print(task.spent_time)
