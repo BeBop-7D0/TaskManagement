@@ -1,5 +1,4 @@
 from uuid import uuid4
-from typing import Optional
 from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field, model_validator
@@ -21,12 +20,16 @@ class TimeRecord(BaseModel):
         if not isinstance(other, TimeRecord):
             raise TypeError("expected type: TimeRecord")
 
-        self.minutes += other.minutes % 60
-        self.hours += other.hours + other.minutes // 60
+        total_minutes = (
+                self.hours * 60
+                + self.minutes
+                + other.hours * 60
+                + other.minutes
+        )
 
         return TimeRecord(
-            hours=self.hours,
-            minutes=self.minutes
+            hours=total_minutes // 60,
+            minutes=total_minutes % 60,
         )
 
     def __sub__(self, other):
@@ -59,7 +62,7 @@ class Deadline(BaseModel):
 
     @model_validator(mode='after')
     def check_datetime(self):
-        tz_info = self.deadline
+        tz_info = self.deadline.tzinfo
         if tz_info is None or tz_info != timezone.utc:
             raise ValueError("UTC time zone is required")
 
@@ -98,7 +101,7 @@ class Task:
         self.executor_id = executor_id
         self.project_id = project_id
         self.status = status
-        self.deadline = Deadline(deadline=deadline)
+        self.deadline = Deadline(deadline=deadline) if deadline else None
         self.estimated_time = TimeRecord(hours=estimated_hours, minutes=estimated_minutes)
         self.spent_time = TimeRecord(hours=spent_hours, minutes=spent_minutes)
 
@@ -134,6 +137,8 @@ class Task:
         if not status.strip():
             raise ValueError("Status of task can not be empty string")
 
+        if not project_id.strip():
+            raise ValueError("Project_id of task can not be empty string")
 
         return cls(
             title,
@@ -188,7 +193,6 @@ if __name__ == "__main__":
         creator_id="creator_id",
         executor_id="executor_id",
         project_id="project_id",
-        status="NEW",
-        deadline=datetime(year=2026, month=8, day=30, tzinfo=timezone.utc)
+        status="NEW"
     )
 
