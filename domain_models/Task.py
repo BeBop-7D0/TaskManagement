@@ -167,7 +167,7 @@ class Task:
         self.description = new_description
 
     def change_executor(self, new_executor_id: str):
-        if not new_executor_id:
+        if not new_executor_id.strip():
             raise ValueError("Executor_id value can not be empty string")
         self.executor_id = new_executor_id
 
