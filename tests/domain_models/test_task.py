@@ -108,91 +108,83 @@ def test_task_creates_valid_value():
 
 
 def test_task_creates_with_correct_deadline_value():
+    dt = datetime.now(tz=timezone.utc) + timedelta(days=1)
     task = Task.create(
         **REQUIRED_PARAMS,
-        deadline=datetime.now(tz=timezone.utc) + timedelta(days=1)
+        deadline=dt
     )
-    assert isinstance(task, Task)
+
     assert task.id is not None
+    assert task.deadline == Deadline(deadline=dt)
 
 
-def test_task_creates_with_wrong_required_params():
-    for param in REQUIRED_PARAMS:
-        with pytest.raises(ValueError):
-            target_params = copy.deepcopy(REQUIRED_PARAMS)
-            target_params[param] = ""
-            Task.create(**target_params)
+@pytest.mark.parametrize("param_name", REQUIRED_PARAMS.keys())
+def test_task_creates_with_wrong_required_params(param_name):
+    with pytest.raises(ValueError):
+        target_params = copy.deepcopy(REQUIRED_PARAMS)
+        target_params[param_name] = ""
+        Task.create(**target_params)
 
 
-def test_task_creates_with_wrong_spend_time():
+@pytest.mark.parametrize("kwarg_name, wrong_value", [("spent_hours", -1), ("spent_minutes", -30)])
+def test_task_creates_with_wrong_spend_time(kwarg_name, wrong_value):
+    target_params = {
+        **REQUIRED_PARAMS,
+        kwarg_name: wrong_value
+    }
     with pytest.raises(pydantic.ValidationError):
         Task.create(
-            **REQUIRED_PARAMS,
-            spent_hours=-1
+            **target_params
         )
 
+@pytest.mark.parametrize("kwarg_name, wrong_value", [("estimated_hours", -2),("estimated_minutes", -30)])
+def test_task_creates_with_wrong_estimated_time(kwarg_name, wrong_value):
+    target_params = {
+        **REQUIRED_PARAMS,
+        kwarg_name: wrong_value
+    }
     with pytest.raises(pydantic.ValidationError):
         Task.create(
-            **REQUIRED_PARAMS,
-            spent_minutes=-1
+            **target_params
         )
 
-def test_task_creates_with_wrong_estimated_time():
-    with pytest.raises(pydantic.ValidationError):
-        Task.create(
-            **REQUIRED_PARAMS,
-             estimated_hours=-1
-        )
-
-    with pytest.raises(pydantic.ValidationError):
-        Task.create(
-            **REQUIRED_PARAMS,
-             estimated_minutes=-1
-        )
 
 @pytest.fixture
 def simple_task():
     return Task.create(**REQUIRED_PARAMS)
 
 
-def test_task_change_title_correct_value(simple_task):
-    simple_task.change_title("new title")
-    assert simple_task.title == "new title"
+@pytest.mark.parametrize(
+    "method_name, attr_name, value",
+    [
+        ("change_title", "title", "new title"),
+        ("change_description", "description", "new description"),
+        ("change_executor", "executor_id", "new executor"),
+        ("change_status", "status", "new status")
+    ],
+    ids=["title", "description", "executor", "status"]
+)
+def test_task_change_correct_value(simple_task, method_name, attr_name, value):
+    method = getattr(simple_task, method_name)
+    method(value)
+    attribute = getattr(simple_task, attr_name)
+    assert attribute == value
 
 
-def test_task_change_title_wrong_value(simple_task):
+@pytest.mark.parametrize(
+    "method_name, wrong_value",
+    [
+        ("change_title", "   "),
+        ("change_description", "   "),
+        ("change_executor", "   "),
+        ("change_status", "   ")
+    ],
+    ids=["change_title", "change_description", "change_executor", "change_status"]
+)
+def test_task_change_wrong_value(simple_task, method_name, wrong_value):
+    method = getattr(simple_task, method_name)
     with pytest.raises(ValueError):
-        simple_task.change_title("      ")
-
-
-def test_task_change_description_correct_value(simple_task):
-    simple_task.change_description("new description")
-    assert simple_task.description == "new description"
-
-
-def test_task_change_description_wrong_value(simple_task):
-    with pytest.raises(ValueError):
-        simple_task.change_description("      ")
-
-
-def test_task_change_executor_correct_value(simple_task):
-    simple_task.change_executor("new executor")
-    assert simple_task.executor_id == "new executor"
-
-
-def test_task_change_executor_wrong_value(simple_task):
-    with pytest.raises(ValueError):
-        simple_task.change_executor("      ")
-
-
-def test_task_change_status_correct_value(simple_task):
-    simple_task.change_status("new status")
-    assert simple_task.status == "new status"
-
-
-def test_task_change_status_wrong_value(simple_task):
-    with pytest.raises(ValueError):
-        simple_task.change_status("      ")
+        method(wrong_value)
 
 
 def test_task_set_deadline_correct_value(simple_task):
