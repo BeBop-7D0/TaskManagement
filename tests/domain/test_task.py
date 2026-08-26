@@ -1,11 +1,13 @@
 import copy
-from zoneinfo import ZoneInfo
 from datetime import datetime, timezone, timedelta
 
 import pytest
 import pydantic
 
-from domain_models.Task import TimeRecord, Deadline, Task
+from domain.task.task import Task, TaskLifecycle
+from domain.task.deadline import Deadline
+from domain.task.time_record import TimeRecord
+
 
 def test_time_record_creates_valid_value():
     tr = TimeRecord(hours=2, minutes=30)
@@ -94,6 +96,7 @@ REQUIRED_PARAMS = {
     "status": "Backlog",
 }
 
+
 def test_task_creates_valid_value():
     task = Task.create(
         **REQUIRED_PARAMS
@@ -118,7 +121,7 @@ def test_task_creates_with_correct_deadline_value():
     assert task.deadline == Deadline(deadline=dt)
 
 
-@pytest.mark.parametrize("param_name", REQUIRED_PARAMS.keys())
+@pytest.mark.parametrize("param_name", REQUIRED_PARAMS)
 def test_task_creates_with_wrong_required_params(param_name):
     with pytest.raises(ValueError):
         target_params = copy.deepcopy(REQUIRED_PARAMS)
@@ -137,6 +140,7 @@ def test_task_creates_with_wrong_spend_time(kwarg_name, wrong_value):
             **target_params
         )
 
+
 @pytest.mark.parametrize("kwarg_name, wrong_value", [("estimated_hours", -2),("estimated_minutes", -30)])
 def test_task_creates_with_wrong_estimated_time(kwarg_name, wrong_value):
     target_params = {
@@ -154,21 +158,25 @@ def simple_task():
     return Task.create(**REQUIRED_PARAMS)
 
 
-@pytest.mark.parametrize(
-    "method_name, attr_name, value",
-    [
-        ("change_title", "title", "new title"),
-        ("change_description", "description", "new description"),
-        ("change_executor", "executor_id", "new executor"),
-        ("change_status", "status", "new status")
-    ],
-    ids=["title", "description", "executor", "status"]
-)
-def test_task_change_correct_value(simple_task, method_name, attr_name, value):
-    method = getattr(simple_task, method_name)
-    method(value)
-    attribute = getattr(simple_task, attr_name)
-    assert attribute == value
+def test_task_change_title_correct_value(simple_task):
+    simple_task.change_title("new title")
+    assert simple_task.title == "new title"
+
+
+
+def test_task_change_description_correct_value(simple_task):
+    simple_task.change_description("new description")
+    assert simple_task.description == "new description"
+
+
+def test_task_change_executor_correct_value(simple_task):
+    simple_task.change_executor("new executor")
+    assert simple_task.executor_id == "new executor"
+
+
+def test_task_change_status_correct_value(simple_task):
+    simple_task.change_status("new status")
+    assert simple_task.status == "new status"
 
 
 @pytest.mark.parametrize(
@@ -179,7 +187,7 @@ def test_task_change_correct_value(simple_task, method_name, attr_name, value):
         ("change_executor", "   "),
         ("change_status", "   ")
     ],
-    ids=["change_title", "change_description", "change_executor", "change_status"]
+    ids=["title", "description", "executor", "status"]
 )
 def test_task_change_wrong_value(simple_task, method_name, wrong_value):
     method = getattr(simple_task, method_name)
@@ -221,3 +229,136 @@ def test_task_add_spend_time_correct_value(simple_task):
 def test_task_add_spend_time_with_wrong_value(simple_task):
     with pytest.raises(ValueError):
         simple_task.add_spend_time(hours=-3, minutes=00)
+
+
+def test_task_active_to_pause(simple_task):
+    simple_task.pause()
+    assert simple_task.lifecycle == TaskLifecycle.PAUSED
+
+
+def test_task_active_to_close(simple_task):
+    simple_task.close()
+    assert simple_task.lifecycle == TaskLifecycle.CLOSED
+
+
+def test_task_active_to_active(simple_task):
+    with pytest.raises(Exception):
+        simple_task.resume()
+
+
+@pytest.mark.parametrize(
+    "method_name, value",
+    [
+        ("change_title", "new_title"),
+        ("change_description", "new_description"),
+        ("change_executor", "new_executor_id"),
+        ("change_status", "DONE"),
+        ("add_spend_time", 1)
+    ],
+    ids=["title", "description", "executor", "status", "spend_time"]
+)
+def test_task_active_required_with_active(simple_task, method_name, value):
+    method = getattr(simple_task, method_name)
+    method(value)
+
+
+def test_task_pause_to_active(simple_task):
+    simple_task.pause()
+    simple_task.resume()
+    assert simple_task.lifecycle == TaskLifecycle.ACTIVE
+
+
+def test_task_pause_to_close(simple_task):
+    simple_task.pause()
+    simple_task.close()
+    assert simple_task.lifecycle == TaskLifecycle.CLOSED
+
+
+def test_task_pause_to_pause(simple_task):
+    simple_task.pause()
+    with pytest.raises(Exception):
+        simple_task.pause()
+
+
+@pytest.mark.parametrize(
+    "method_name, value",
+    [
+        ("change_title", "new_title"),
+        ("change_description", "new_description"),
+        ("change_executor", "new_executor_id"),
+        ("change_status", "DONE"),
+        ("add_spend_time", 1)
+    ],
+    ids=["title", "description", "executor", "status", "spend_time"]
+)
+def test_task_active_required_with_paused(simple_task, method_name, value):
+    simple_task.pause()
+    method = getattr(simple_task, method_name)
+    with pytest.raises(Exception):
+        method(value)
+
+
+def test_task_close_to_active(simple_task):
+    simple_task.close()
+    with pytest.raises(Exception):
+        simple_task.resume()
+
+
+def test_task_close_to_pause(simple_task):
+    simple_task.pause()
+    with pytest.raises(Exception):
+        simple_task.pause()
+
+
+def test_task_close_to_close(simple_task):
+    simple_task.close()
+    with pytest.raises(Exception):
+        simple_task.pause()
+
+
+@pytest.mark.parametrize(
+    "method_name, value",
+    [
+        ("change_title", "new_title"),
+        ("change_description", "new_description"),
+        ("change_executor", "new_executor_id"),
+        ("change_status", "DONE"),
+        ("add_spend_time", 1)
+    ],
+    ids=["title", "description", "executor", "status", "spend_time"]
+)
+def test_task_active_required_with_closed(simple_task, method_name, value):
+    simple_task.close()
+    method = getattr(simple_task, method_name)
+    with pytest.raises(Exception):
+        method(value)
+
+
+def test_task_set_deadline_when_closed(simple_task):
+    dt = datetime.now(tz=timezone.utc) + timedelta(days=1)
+    simple_task.close()
+    simple_task.set_deadline(dt)
+
+    assert simple_task.deadline == Deadline(deadline=dt)
+
+
+def test_task_set_deadline_when_paused(simple_task):
+    dt = datetime.now(tz=timezone.utc) + timedelta(days=1)
+    simple_task.pause()
+    simple_task.set_deadline(dt)
+
+    assert simple_task.deadline == Deadline(deadline=dt)
+
+
+def test_task_set_estimated_time_when_closed(simple_task):
+    simple_task.close()
+    simple_task.set_estimated_time(hours=12, minutes=30)
+
+    assert simple_task.estimated_time == TimeRecord(hours=12, minutes=30)
+
+
+def test_task_set_estimated_time_when_paused(simple_task):
+    simple_task.pause()
+    simple_task.set_estimated_time(hours=12, minutes=30)
+
+    assert simple_task.estimated_time == TimeRecord(hours=12, minutes=30)
