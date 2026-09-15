@@ -367,12 +367,16 @@ def test_task_set_estimated_time_when_paused(simple_task):
 def test_task_add_comment_with_correct_data(simple_task):
     comment_id = simple_task.add_comment(
         author_id="some_author_id",
-        content="some content"
+        content="some content",
     )
 
-    target_comment = next((x.comment_id for x in simple_task.comments if x.comment_id == comment_id), None)
+    assert len(simple_task.comments) == 1
 
-    assert isinstance(target_comment, str)
+    comment = simple_task.comments[0]
+
+    assert comment.comment_id == comment_id
+    assert comment.author_id == "some_author_id"
+    assert comment.content == "some content"
 
 
 

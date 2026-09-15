@@ -184,12 +184,6 @@ class Task:
 
 
     def add_comment(self, author_id: str, content: str) -> str:
-        if not content.strip():
-            raise ValueError("Content can't be empty")
-
-        if not author_id.strip():
-            raise ValueError("Author can't be empty")
-
         comment = Comment(
             author_id=author_id,
             content=content
