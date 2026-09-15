@@ -362,3 +362,45 @@ def test_task_set_estimated_time_when_paused(simple_task):
     simple_task.set_estimated_time(hours=12, minutes=30)
 
     assert simple_task.estimated_time == TimeRecord(hours=12, minutes=30)
+
+
+def test_task_add_comment_with_correct_data(simple_task):
+    comment_id = simple_task.add_comment(
+        author_id="some_author_id",
+        content="some content"
+    )
+
+    target_comment = next((x.comment_id for x in simple_task.comments if x.comment_id == comment_id), None)
+
+    assert isinstance(target_comment, str)
+
+
+
+@pytest.mark.parametrize(
+    "params_value",
+    [("  ", "some content"),("some_author_id", "")],
+    ids=["empty_author", "empty_content"]
+)
+def test_task_add_comment_with_wrong_data(simple_task, params_value):
+    with pytest.raises(ValueError):
+        simple_task.add_comment(*params_value)
+
+
+def test_task_delete_exist_comment(simple_task):
+    comment_id = simple_task.add_comment(
+        author_id="some_author_id",
+        content="some content"
+    )
+    simple_task.remove_comment(comment_id)
+    target_comment = next((x.comment_id for x in simple_task.comments if x.comment_id == comment_id), None)
+
+    assert target_comment is None
+
+
+def test_task_delete_not_exist_comment(simple_task):
+    simple_task.add_comment(
+        author_id="some_author_id",
+        content="some content"
+    )
+    with pytest.raises(KeyError):
+        simple_task.remove_comment("non exist id")

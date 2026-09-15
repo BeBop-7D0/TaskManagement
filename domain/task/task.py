@@ -183,19 +183,20 @@ class Task:
         return tuple(self._comments)
 
 
-    def add_comment(self, author_id: str, content: str):
+    def add_comment(self, author_id: str, content: str) -> str:
         if not content.strip():
             raise ValueError("Content can't be empty")
 
         if not author_id.strip():
             raise ValueError("Author can't be empty")
 
-        self._comments.append(
-            Comment(
-                author_id=author_id,
-                content=content
-            )
+        comment = Comment(
+            author_id=author_id,
+            content=content
         )
+        self._comments.append(comment)
+
+        return comment.comment_id
 
     def remove_comment(self, comment_id: str):
         if not comment_id.strip():
