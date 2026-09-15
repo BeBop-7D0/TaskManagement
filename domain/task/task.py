@@ -5,6 +5,7 @@ from functools import wraps
 
 from domain.task.deadline import Deadline
 from domain.task.time_record import TimeRecord
+from domain.task.comment import Comment
 
 
 class TaskLifecycle(str, Enum):
@@ -44,10 +45,12 @@ class Task:
             estimated_hours: int = 0,
             estimated_minutes: int = 0,
             spent_hours: int = 0,
-            spent_minutes: int = 0
+            spent_minutes: int = 0,
+            comments: list[Comment] = None
 
     ):
         self.id = str(uuid4())
+        self._comments = comments if comments is not None else []
         self.lifecycle = TaskLifecycle.ACTIVE
         self.title = title
         self.description = description
@@ -173,6 +176,39 @@ class Task:
         if target_lifecycle not in available_lifecycles:
             raise Exception(f"Only switches are possible for {self.lifecycle.value}: {available_lifecycles}")
         self.lifecycle = target_lifecycle
+
+
+    @property
+    def comments(self) -> tuple[Comment]:
+        return tuple(self._comments)
+
+
+    def add_comment(self, author_id: str, content: str):
+        if not content.strip():
+            raise ValueError("Content can't be empty")
+
+        if not author_id.strip():
+            raise ValueError("Author can't be empty")
+
+        self._comments.append(
+            Comment(
+                author_id=author_id,
+                content=content
+            )
+        )
+
+    def remove_comment(self, comment_id: str):
+        if not comment_id.strip():
+            raise ValueError("Comment id can't be empty")
+
+        remove_comment_id = next((i for i, c in enumerate(self._comments) if c.comment_id == comment_id), None)
+
+        if remove_comment_id is None:
+            raise KeyError("Comment with this comment id not found")
+
+        removed = self._comments.pop(remove_comment_id)
+        return removed
+
 
 
 if __name__ == "__main__":
