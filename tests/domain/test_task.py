@@ -4,10 +4,10 @@ from datetime import datetime, timezone, timedelta
 import pytest
 import pydantic
 
-from domain.task.task import Task, TaskLifecycle
 from domain.task.deadline import Deadline
+from domain.task.history import HistoryAction, HistoryEntry, BaseActionData, ChangeDescriptionData
 from domain.task.time_record import TimeRecord
-
+from domain.task.task import Task, TaskLifecycle
 
 def test_time_record_creates_valid_value():
     tr = TimeRecord(hours=2, minutes=30)
@@ -159,45 +159,45 @@ def simple_task():
 
 
 def test_task_change_title_correct_value(simple_task):
-    simple_task.change_title("new title")
+    simple_task.change_title("new title", "actor_id")
     assert simple_task.title == "new title"
 
 
 
 def test_task_change_description_correct_value(simple_task):
-    simple_task.change_description("new description")
+    simple_task.change_description("new description", "actor_id")
     assert simple_task.description == "new description"
 
 
 def test_task_change_executor_correct_value(simple_task):
-    simple_task.change_executor("new executor")
+    simple_task.change_executor("new executor", "actor_id")
     assert simple_task.executor_id == "new executor"
 
 
 def test_task_change_status_correct_value(simple_task):
-    simple_task.change_status("new status")
+    simple_task.change_status("new status", "actor_id")
     assert simple_task.status == "new status"
 
 
 @pytest.mark.parametrize(
     "method_name, wrong_value",
     [
-        ("change_title", "   "),
-        ("change_description", "   "),
-        ("change_executor", "   "),
-        ("change_status", "   ")
+        ("change_title", ("   ", "actor_id")),
+        ("change_description", ("   ", "actor_id")),
+        ("change_executor", ("   ", "actor_id")),
+        ("change_status", ("   ", "actor_id"))
     ],
     ids=["title", "description", "executor", "status"]
 )
 def test_task_change_wrong_value(simple_task, method_name, wrong_value):
     method = getattr(simple_task, method_name)
     with pytest.raises(ValueError):
-        method(wrong_value)
+        method(*wrong_value)
 
 
 def test_task_set_deadline_correct_value(simple_task):
     dt = datetime.now(tz=timezone.utc) + timedelta(days=1)
-    simple_task.set_deadline(dt)
+    simple_task.set_deadline(dt, "actor_id")
 
     assert simple_task.deadline == Deadline(deadline=dt)
 
@@ -205,79 +205,79 @@ def test_task_set_deadline_correct_value(simple_task):
 def test_task_set_deadline_with_past_value(simple_task):
     dt = datetime.now(tz=timezone.utc) - timedelta(days=1)
     with pytest.raises(ValueError):
-        simple_task.set_deadline(dt)
+        simple_task.set_deadline(dt, "actor_id")
 
 
 def test_task_set_estimated_time_correct_value(simple_task):
-    simple_task.set_estimated_time(hours=12, minutes=30)
+    simple_task.set_estimated_time("actor_id", hours=12, minutes=30)
 
     assert simple_task.estimated_time == TimeRecord(hours=12, minutes=30)
 
 
 def test_task_set_estimated_time_with_wrong_value(simple_task):
     with pytest.raises(ValueError):
-        simple_task.set_estimated_time(hours=1.2, minutes=30)
+        simple_task.set_estimated_time("actor_id", hours=1.2, minutes=30)
 
 
 def test_task_add_spend_time_correct_value(simple_task):
-    simple_task.add_spend_time(hours=1, minutes=30)
-    simple_task.add_spend_time(hours=1, minutes=30)
+    simple_task.add_spend_time("actor_id", hours=1, minutes=30)
+    simple_task.add_spend_time("actor_id", hours=1, minutes=30)
 
     assert simple_task.spent_time == TimeRecord(hours=3, minutes=00)
 
 
 def test_task_add_spend_time_with_wrong_value(simple_task):
     with pytest.raises(ValueError):
-        simple_task.add_spend_time(hours=-3, minutes=00)
+        simple_task.add_spend_time("actor_id", hours=-3, minutes=00)
 
 
 def test_task_active_to_pause(simple_task):
-    simple_task.pause()
+    simple_task.pause("actor_id")
     assert simple_task.lifecycle == TaskLifecycle.PAUSED
 
 
 def test_task_active_to_close(simple_task):
-    simple_task.close()
+    simple_task.close("actor_id")
     assert simple_task.lifecycle == TaskLifecycle.CLOSED
 
 
 def test_task_active_to_active(simple_task):
     with pytest.raises(Exception):
-        simple_task.resume()
+        simple_task.resume("actor_id")
 
 
 @pytest.mark.parametrize(
     "method_name, value",
     [
-        ("change_title", "new_title"),
-        ("change_description", "new_description"),
-        ("change_executor", "new_executor_id"),
-        ("change_status", "DONE"),
-        ("add_spend_time", 1)
+        ("change_title", ("new_title", "actor_id")),
+        ("change_description", ("new_description", "actor_id")),
+        ("change_executor", ("new_executor_id", "actor_id")),
+        ("change_status", ("DONE", "actor_id")),
+        ("add_spend_time", ("actor_id", 1))
     ],
     ids=["title", "description", "executor", "status", "spend_time"]
 )
 def test_task_active_required_with_active(simple_task, method_name, value):
     method = getattr(simple_task, method_name)
-    method(value)
+    method(*value)
 
 
 def test_task_pause_to_active(simple_task):
-    simple_task.pause()
-    simple_task.resume()
+    simple_task.pause("actor_id")
+    simple_task.resume("actor_id")
     assert simple_task.lifecycle == TaskLifecycle.ACTIVE
 
 
 def test_task_pause_to_close(simple_task):
-    simple_task.pause()
-    simple_task.close()
+    simple_task.pause("actor_id")
+    simple_task.close("actor_id")
     assert simple_task.lifecycle == TaskLifecycle.CLOSED
 
 
 def test_task_pause_to_pause(simple_task):
-    simple_task.pause()
+    simple_task.pause("actor_id")
     with pytest.raises(Exception):
-        simple_task.pause()
+        simple_task.pause("actor_id")
 
 
 @pytest.mark.parametrize(
@@ -292,74 +292,74 @@ def test_task_pause_to_pause(simple_task):
     ids=["title", "description", "executor", "status", "spend_time"]
 )
 def test_task_active_required_with_paused(simple_task, method_name, value):
-    simple_task.pause()
+    simple_task.pause("actor_id")
     method = getattr(simple_task, method_name)
     with pytest.raises(Exception):
-        method(value)
+        method(value, "actor_id")
 
 
 def test_task_close_to_active(simple_task):
-    simple_task.close()
+    simple_task.close("actor_id")
     with pytest.raises(Exception):
-        simple_task.resume()
+        simple_task.resume("actor_id")
 
 
 def test_task_close_to_pause(simple_task):
-    simple_task.pause()
+    simple_task.pause("actor_id")
     with pytest.raises(Exception):
-        simple_task.pause()
+        simple_task.pause("actor_id")
 
 
 def test_task_close_to_close(simple_task):
-    simple_task.close()
+    simple_task.close("actor_id")
     with pytest.raises(Exception):
-        simple_task.pause()
+        simple_task.pause("actor_id")
 
 
 @pytest.mark.parametrize(
     "method_name, value",
     [
-        ("change_title", "new_title"),
-        ("change_description", "new_description"),
-        ("change_executor", "new_executor_id"),
-        ("change_status", "DONE"),
-        ("add_spend_time", 1)
+        ("change_title", ("new_title", "actor_id")),
+        ("change_description", ("new_description", "actor_id")),
+        ("change_executor", ("new_executor_id", "actor_id")),
+        ("change_status", ("DONE", "actor_id")),
+        ("add_spend_time", ("actor_id", 1))
     ],
     ids=["title", "description", "executor", "status", "spend_time"]
 )
 def test_task_active_required_with_closed(simple_task, method_name, value):
-    simple_task.close()
+    simple_task.close("actor_id")
     method = getattr(simple_task, method_name)
     with pytest.raises(Exception):
-        method(value)
+        method(*value)
 
 
 def test_task_set_deadline_when_closed(simple_task):
     dt = datetime.now(tz=timezone.utc) + timedelta(days=1)
-    simple_task.close()
-    simple_task.set_deadline(dt)
+    simple_task.close("actor_id")
+    simple_task.set_deadline(dt, "actor_id")
 
     assert simple_task.deadline == Deadline(deadline=dt)
 
 
 def test_task_set_deadline_when_paused(simple_task):
     dt = datetime.now(tz=timezone.utc) + timedelta(days=1)
-    simple_task.pause()
-    simple_task.set_deadline(dt)
+    simple_task.pause("actor_id")
+    simple_task.set_deadline(dt, "actor_id")
 
     assert simple_task.deadline == Deadline(deadline=dt)
 
 
 def test_task_set_estimated_time_when_closed(simple_task):
-    simple_task.close()
-    simple_task.set_estimated_time(hours=12, minutes=30)
+    simple_task.close("actor_id")
+    simple_task.set_estimated_time("actor_id", hours=12, minutes=30)
 
     assert simple_task.estimated_time == TimeRecord(hours=12, minutes=30)
 
 
 def test_task_set_estimated_time_when_paused(simple_task):
-    simple_task.pause()
-    simple_task.set_estimated_time(hours=12, minutes=30)
+    simple_task.pause("actor_id")
+    simple_task.set_estimated_time("actor_id", hours=12, minutes=30)
 
     assert simple_task.estimated_time == TimeRecord(hours=12, minutes=30)
 
@@ -408,3 +408,195 @@ def test_task_delete_not_exist_comment(simple_task):
     )
     with pytest.raises(KeyError):
         simple_task.remove_comment("non exist id")
+
+
+def test_history_create_valid():
+    history_entry = HistoryEntry(
+        actor_id="123",
+        action=HistoryAction.TASK_CREATE
+    )
+    assert history_entry.history_id is not None and isinstance(history_entry.history_id, str)
+    assert isinstance(history_entry.data, BaseActionData)
+    assert isinstance(history_entry.created_at, datetime)
+    assert history_entry.created_at.tzinfo == timezone.utc
+
+
+def test_history_different_id():
+    history_entry_1 = HistoryEntry(
+        actor_id="123",
+        action=HistoryAction.TASK_CREATE
+    )
+
+    history_entry_2 = HistoryEntry(
+        actor_id="123",
+        action=HistoryAction.TASK_CREATE
+    )
+    assert history_entry_1.history_id != history_entry_2.history_id
+
+
+def test_history_wrong_actor():
+    with pytest.raises(ValueError):
+        HistoryEntry(
+            actor_id="    ",
+            action=HistoryAction.TASK_CREATE
+        )
+
+
+def test_history_wrong_data_type():
+    with pytest.raises(ValueError):
+        HistoryEntry(
+            actor_id="123",
+            action=HistoryAction.CHANGE_TITLE
+        )
+
+    with pytest.raises(ValueError):
+        HistoryEntry(
+            actor_id="123",
+            action=HistoryAction.CHANGE_TITLE,
+            data=ChangeDescriptionData(
+                old_description="some_desc",
+                new_description="some_new_desc"
+            )
+        )
+
+
+def test_task_cannot_change_history(simple_task):
+    with pytest.raises(AttributeError):
+        simple_task.history = [
+            HistoryEntry(
+                actor_id="123",
+                action=HistoryAction.TASK_CREATE
+            )
+        ]
+
+
+def test_task_create_history(simple_task):
+    history = simple_task.history
+    assert len(history) == 1
+    entry_of_create = history[0]
+    assert entry_of_create.action == HistoryAction.TASK_CREATE
+    assert entry_of_create.actor_id == simple_task.creator_id
+
+
+def test_task_change_title_history_entry(simple_task):
+    actor_id = "actor_1"
+    simple_task.change_title("new_title", actor_id)
+
+    target_entry = next((x for x in simple_task.history if x.actor_id == actor_id), None)
+
+    assert target_entry is not None
+    assert target_entry.actor_id == actor_id
+    assert target_entry.action == HistoryAction.CHANGE_TITLE
+
+
+def test_task_change_description_history_entry(simple_task):
+    actor_id = "actor_1"
+    simple_task.change_description("new_descr", actor_id)
+
+    target_entry = next((x for x in simple_task.history if x.actor_id == actor_id), None)
+
+    assert target_entry is not None
+    assert target_entry.actor_id == actor_id
+    assert target_entry.action == HistoryAction.CHANGE_DESCRIPTION
+
+
+def test_task_change_executor_history_entry(simple_task):
+    actor_id = "actor_1"
+    simple_task.change_executor("new_executor_id", actor_id)
+
+    target_entry = next((x for x in simple_task.history if x.actor_id == actor_id), None)
+
+    assert target_entry is not None
+    assert target_entry.actor_id == actor_id
+    assert target_entry.action == HistoryAction.CHANGE_EXECUTOR
+
+
+def test_task_change_status_history_entry(simple_task):
+    actor_id = "actor_1"
+    simple_task.change_status("DONE", actor_id)
+
+    target_entry = next((x for x in simple_task.history if x.actor_id == actor_id), None)
+
+    assert target_entry is not None
+    assert target_entry.actor_id == actor_id
+    assert target_entry.action == HistoryAction.CHANGE_STATUS
+
+
+def test_task_change_deadline_history_entry(simple_task):
+    actor_id = "actor_1"
+    dt = datetime.now(tz=timezone.utc) + timedelta(days=3)
+    simple_task.set_deadline(dt, actor_id)
+
+    target_entry = next((x for x in simple_task.history if x.actor_id == actor_id), None)
+
+    assert target_entry is not None
+    assert target_entry.actor_id == actor_id
+    assert target_entry.action == HistoryAction.CHANGE_DEADLINE
+    assert target_entry.data.new_deadline == Deadline(deadline=dt)
+
+
+def test_task_change_estimated_history_entry(simple_task):
+    actor_id = "actor_1"
+    simple_task.set_estimated_time(actor_id, hours=1)
+
+    target_entry = next((x for x in simple_task.history if x.actor_id == actor_id), None)
+
+    assert target_entry is not None
+    assert target_entry.actor_id == actor_id
+    assert target_entry.action == HistoryAction.CHANGE_ESTIMATED_TIME
+    assert target_entry.data.new_estimated == TimeRecord(hours=1)
+
+
+def test_task_add_spent_time_history_entry(simple_task):
+    actor_id = "actor_1"
+    simple_task.add_spend_time(actor_id, hours=1)
+
+    target_entry = next((x for x in simple_task.history if x.actor_id == actor_id), None)
+
+    assert target_entry is not None
+    assert target_entry.actor_id == actor_id
+    assert target_entry.action == HistoryAction.CHANGE_SPENT_TIME
+    assert target_entry.data.old_spent == TimeRecord(hours=0, minutes=0)
+    assert target_entry.data.new_spent== TimeRecord(hours=1, minutes=0)
+
+
+def test_task_paused_history_entry(simple_task):
+    actor_id = "actor_1"
+    simple_task.pause(actor_id)
+
+    target_entry = next((x for x in simple_task.history if x.actor_id == actor_id), None)
+
+    assert target_entry is not None
+    assert target_entry.actor_id == actor_id
+    assert target_entry.action == HistoryAction.TASK_PAUSE
+    assert target_entry.data.old_lifecycle == TaskLifecycle.ACTIVE
+    assert target_entry.data.new_lifecycle == TaskLifecycle.PAUSED
+
+
+def test_task_close_history_entry(simple_task):
+    actor_id = "actor_1"
+    simple_task.close(actor_id)
+
+    target_entry = next((x for x in simple_task.history if x.actor_id == actor_id), None)
+
+    assert target_entry is not None
+    assert target_entry.actor_id == actor_id
+    assert target_entry.action == HistoryAction.TASK_CLOSE
+    assert target_entry.data.old_lifecycle == TaskLifecycle.ACTIVE
+    assert target_entry.data.new_lifecycle == TaskLifecycle.CLOSED
+
+
+def test_task_resume_history_entry(simple_task):
+    pause_actor_id = "actor_1"
+    simple_task.pause(pause_actor_id)
+
+    resume_actor_id = "actor_2"
+    simple_task.resume(resume_actor_id)
+
+    target_entry = next((x for x in simple_task.history if x.actor_id == resume_actor_id), None)
+
+    assert target_entry is not None
+    assert target_entry.actor_id == resume_actor_id
+    assert target_entry.action == HistoryAction.TASK_RESUME
+    assert target_entry.data.old_lifecycle == TaskLifecycle.PAUSED
+    assert target_entry.data.new_lifecycle == TaskLifecycle.ACTIVE
