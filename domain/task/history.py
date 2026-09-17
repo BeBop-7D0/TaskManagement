@@ -51,15 +51,15 @@ class ChangeExecutorData(BaseActionData):
 
 class ChangeDeadlineData(BaseActionData):
     old_deadline: Deadline | None = None
-    new_deadline: Deadline
+    new_deadline: Deadline | None = None
 
 
-class ChangeEstimatedData(BaseActionData):
+class ChangeEstimatedTimeData(BaseActionData):
     old_estimated: TimeRecord
     new_estimated: TimeRecord
 
 
-class ChangeSpentData(BaseActionData):
+class ChangeSpentTimeData(BaseActionData):
     old_spent: TimeRecord
     new_spent: TimeRecord
 
@@ -77,8 +77,8 @@ ActionDataUnion = Union[
     ChangeStatusData,
     ChangeExecutorData,
     ChangeDeadlineData,
-    ChangeEstimatedData,
-    ChangeSpentData,
+    ChangeEstimatedTimeData,
+    ChangeSpentTimeData,
     LifeCycleChangeData,
 ]
 
@@ -89,8 +89,8 @@ ACTION_DATA_MAP: dict[HistoryAction, type[BaseActionData]] = {
     HistoryAction.CHANGE_STATUS: ChangeStatusData,
     HistoryAction.CHANGE_EXECUTOR: ChangeExecutorData,
     HistoryAction.CHANGE_DEADLINE: ChangeDeadlineData,
-    HistoryAction.CHANGE_ESTIMATED_TIME: ChangeEstimatedData,
-    HistoryAction.CHANGE_SPENT_TIME: ChangeSpentData,
+    HistoryAction.CHANGE_ESTIMATED_TIME: ChangeEstimatedTimeData,
+    HistoryAction.CHANGE_SPENT_TIME: ChangeSpentTimeData,
     HistoryAction.TASK_PAUSE: LifeCycleChangeData,
     HistoryAction.TASK_RESUME: LifeCycleChangeData,
     HistoryAction.TASK_CLOSE: LifeCycleChangeData,
@@ -129,17 +129,3 @@ class HistoryEntry(BaseModel):
 
         return self
 
-
-if __name__ == "__main__":
-
-
-    history_record = HistoryEntry(
-        actor_id="123",
-        action=HistoryAction.CHANGE_DEADLINE,
-        data=ChangeDeadlineData(
-            old_deadline=Deadline(deadline=datetime.now(timezone.utc) + timedelta(days=1)),
-            new_deadline=Deadline(deadline=datetime.now(timezone.utc) + timedelta(days=2))
-        )
-    )
-    print(type(history_record.data))
-    print(history_record.model_dump_json(indent=2, ensure_ascii=False))

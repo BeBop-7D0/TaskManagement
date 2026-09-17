@@ -9,7 +9,7 @@ from domain.task.time_record import TimeRecord
 from domain.task.lifecycle import TaskLifecycle
 from domain.task.history import (HistoryAction, HistoryEntry, ActionDataUnion, ChangeTitleData,
                                  ChangeDescriptionData, ChangeExecutorData, ChangeStatusData,
-                                 ChangeDeadlineData, ChangeEstimatedData, ChangeSpentData, LifeCycleChangeData)
+                                 ChangeDeadlineData, ChangeEstimatedTimeData, ChangeSpentTimeData, LifeCycleChangeData)
 
 
 
@@ -218,7 +218,7 @@ class Task:
             HistoryEntry(
                 actor_id=actor_id,
                 action=HistoryAction.CHANGE_ESTIMATED_TIME,
-                data=ChangeEstimatedData(
+                data=ChangeEstimatedTimeData(
                     old_estimated=old_estimated_time,
                     new_estimated=self.estimated_time
                 )
@@ -235,7 +235,7 @@ class Task:
             HistoryEntry(
                 actor_id=actor_id,
                 action=HistoryAction.CHANGE_SPENT_TIME,
-                data=ChangeSpentData(
+                data=ChangeSpentTimeData(
                     old_spent=old_spent_time,
                     new_spent=self.spent_time
                 )
