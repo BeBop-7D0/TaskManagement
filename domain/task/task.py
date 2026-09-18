@@ -45,10 +45,11 @@ class Task:
             spent_hours: int = 0,
             spent_minutes: int = 0,
             comments: list[Comment] = None,
-            history: list[HistoryEntry] = None
+            history: list[HistoryEntry] = None,
+            task_id: str = None
 
     ):
-        self.id = str(uuid4())
+        self.id = task_id if task_id else str(uuid4())
         self._comments = comments if comments is not None else []
         self._history = history if history is not None else []
         self.lifecycle = TaskLifecycle.ACTIVE
